@@ -7,12 +7,3 @@ class Message(models.Model):
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
 
-
-
-# Store E2EE keys
-class UserKey(models.Model):
-    username = models.CharField(max_length=150, unique=True)
-    public_key = models.BinaryField()
-
-    def __str__(self):
-        return self.username

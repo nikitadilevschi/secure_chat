@@ -46,25 +46,6 @@
     </form>
 </section>
 <script>
-    //
-async function getPublicKey(username) {
-    const response = await fetch(`/api/get-public-key/?username=${username}`);
-    const data = await response.json();
-    return data.public_key;
-}
-
-async function sendMessage() {
-    const messageInput = document.querySelector("#id_message_send_input").value;
-    const publicKey = await getPublicKey("recipient_username");
-
-    const encrypt = new JSEncrypt();
-    encrypt.setPublicKey(publicKey);
-    const encryptedMessage = encrypt.encrypt(messageInput);
-
-    chatSocket.send(JSON.stringify({ message: encryptedMessage, username: "{{ request.user.username }}" }));
-    document.querySelector("#id_message_send_input").value = "";
-}
-    //
     const chatSocket = new WebSocket("ws://" + window.location.host + "/");
 
     chatSocket.onopen = function (e) {
@@ -80,7 +61,12 @@ async function sendMessage() {
     function sendMessage() {
         if (chatSocket.readyState === WebSocket.OPEN) {
             var messageInput = document.querySelector("#id_message_send_input").value;
-            chatSocket.send(JSON.stringify({ message: messageInput, username: "{{ request.user.username }}" }));
+            var recipient = "recipient_username"; // Replace with actual recipient username
+            chatSocket.send(JSON.stringify({
+                message: messageInput,
+                username: "{{ request.user.username }}",
+                recipient: recipient
+            }));
             document.querySelector("#id_message_send_input").value = "";
         } else {
             console.log("WebSocket is not open. Ready state: " + chatSocket.readyState);

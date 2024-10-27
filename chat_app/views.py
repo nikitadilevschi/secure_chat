@@ -2,43 +2,63 @@ import json
 from django.shortcuts import render, redirect
 import rsa
 from django.http import JsonResponse
-from .models import UserKey
+import os
+import django
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from django.contrib.auth.models import User
+from .models import Message
+
+django.setup()
+
+# Directory to store keys
+KEYS_DIR = 'keys'
+
+# Ensure the directory exists
+os.makedirs(KEYS_DIR, exist_ok=True)
+
+def generate_key_pair(username):
+    # Generate private key
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+
+    # Generate public key
+    public_key = private_key.public_key()
+
+    # Serialize private key
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    # Serialize public key
+    public_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    # Save keys to files
+    with open(os.path.join(KEYS_DIR, f'{username}_private_key.pem'), 'wb') as private_file:
+        private_file.write(private_pem)
+    with open(os.path.join(KEYS_DIR, f'{username}_public_key.pem'), 'wb') as public_file:
+        public_file.write(public_pem)
+
+    print(f"Keys generated and saved for {username}")
+
+
+
 
 
 def chat(request, *args, **kwargs):
     if not request.user.is_authenticated:
         return redirect("login-user")
-    context = {}
+    generate_key_pair(request.user)
+
+    messages = Message.objects.filter(receiver=request.user)
+    context = {
+        'messages': messages,
+    }
     return render(request, "chat_app/chat.html", context)
-
-def create_user_key(username):
-    # Generate RSA keys
-    public_key, private_key = rsa.newkeys(512)
-
-    # Save the public key
-    UserKey.objects.create(
-        username=username,
-        public_key=public_key.save_pkcs1()
-    )
-
-    # Private key could be saved securely or provided only to the user
-    return private_key.save_pkcs1()
-
-def get_public_key(request):
-    username = request.GET.get('username')
-    user_key = UserKey.objects.get(username=username)
-    return JsonResponse({'public_key': user_key.public_key.decode('utf-8')})
-
-def decrypt_message(encrypted_message, private_key_str):
-    private_key = rsa.PrivateKey.load_pkcs1(private_key_str)
-    return rsa.decrypt(encrypted_message, private_key).decode('utf-8')
-
-async def receive(self, text_data):
-    data = json.loads(text_data)
-    encrypted_message = data["message"]
-
-    # Get recipient's private key
-    recipient_key = UserKey.objects.get(username=data['recipient'])
-    private_key = recipient_key.private_key  # Load or retrieve private key securely
-
-    decrypted_message = decrypt_message(encrypted_message.encode('utf-8'), private_key)
